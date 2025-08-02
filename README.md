@@ -8,21 +8,27 @@ A minimal SvelteKit reproduction case for the `effect_update_depth_exceeded` err
 
 ## 🐛 Issue Summary
 
-The @iconify/svelte library throws a `effect_update_depth_exceeded` error when rendering many icons under specific conditions. This repository provides a minimal reproduction case that identifies **two distinct crash patterns**.
+The @iconify/svelte library throws a `effect_update_depth_exceeded` error when rendering many icons under specific conditions. This repository provides a minimal reproduction case that identifies **three distinct crash patterns**.
 
 ## 🎯 Key Findings
 
-### Pattern 1: Multiple Panes Issue
+### Pattern 1: PaneForge Interaction Issue ⚠️ **PRIMARY CAUSE**
 
-- **❌ Crashes**: 500+ icons per pane when distributed across multiple PaneForge panes
-- **Threshold**: 500 icons × 3 panes = 1500 total icons triggers crash
-- **Root Cause**: Interaction between PaneForge pane management and Iconify's state management
+- **❌ With PaneForge**: Crashes at ~1400 icons regardless of loading method
+- **✅ Without PaneForge**: Up to 2000+ icons work with incremental loading
+- **Root Cause**: **PaneForge interaction breaks both incremental and direct loading**
 
-### Pattern 2: Initial Bulk Loading Issue
+### Pattern 2: Pure Iconify Initialization Issue
 
-- **❌ Crashes**: 1000+ icons in single pane when loaded on initial page load
-- **✅ Works**: Same icon count when reached incrementally through user interaction
-- **Root Cause**: Iconify's initialization phase cannot handle simultaneous processing of many icons
+- **❌ Direct Navigation**: Crashes at 1500+ icons without PaneForge on initial page load
+- **✅ Incremental Loading**: Works fine up to 2000+ icons without PaneForge
+- **Root Cause**: Iconify's bulk initialization overwhelms Svelte 5's effect system
+
+### Pattern 3: Loading Method Makes the Difference
+
+- **Incremental Loading**: Allows Iconify to process icons gradually as user increases count
+- **Direct Navigation**: Forces simultaneous processing during page initialization
+- **Key Insight**: The issue is about initialization timing, not just total icon count
 
 ## 🧪 How to Reproduce
 
@@ -35,41 +41,47 @@ npm run dev
 
 ### Test Cases
 
-#### Test Case 1: Multiple Panes (Distributed Icons)
+#### Test Case 1: PaneForge Impact (Most Important!)
 
-1. Switch to 3-pane layout (modify code to restore 3 panes)
-2. Set icon count to 500 per pane
-3. **Result**: `effect_update_depth_exceeded` error
+1. **Without PaneForge + Incremental**: Start at 100, increase to 2000+ icons ✅ Works
+2. **Without PaneForge + Direct**: Navigate to `?count=1500&paneforge=false` ❌ Crashes
+3. **With PaneForge + Incremental**: Start at 100, increase to 1400 icons ❌ Crashes  
+4. **With PaneForge + Direct**: Navigate to `?count=1400&paneforge=true` ❌ Crashes
+5. **Conclusion**: PaneForge breaks both loading methods at 1400 icons
 
-#### Test Case 2: Single Pane Initial Load
+#### Test Case 2: Loading Method Comparison (Without PaneForge)
 
-1. Edit `src/routes/+page.svelte` and set `iconCount = $state(1500)`
-2. Refresh page
-3. **Result**: `effect_update_depth_exceeded` error on page load
+1. **Incremental**: Use input field to go 100 → 500 → 1000 → 2000 ✅ Works
+2. **Direct Navigation**: Go directly to `?count=1500&paneforge=false` ❌ Crashes
+3. **Conclusion**: Direct navigation fails at 1500+, incremental works at 2000+
 
-#### Test Case 3: Single Pane Incremental
+#### Test Case 3: URL Parameter Testing
 
-1. Start with `iconCount = $state(100)`
-2. Use the input field to gradually increase to 3000
-3. **Result**: No errors, works perfectly
+Use these URLs to test different scenarios:
+- `?count=1400&paneforge=false` - ✅ Works (incremental safe, direct safe)
+- `?count=1500&paneforge=false` - ❌ Crashes (direct navigation)
+- `?count=1400&paneforge=true` - ❌ Crashes (PaneForge breaks everything)
+- `?count=2000&paneforge=false` - ❌ Crashes (direct navigation high volume)
 
 ## 🔧 Current Configuration
 
-The repository is currently set up to test **Pattern 2** (single pane configuration):
+The repository includes a **toggle to test with/without PaneForge**:
 
-- **Pane 1**: Empty (for comparison)
-- **Pane 2**: Contains all test icons
+- **Checkbox**: "Use PaneForge" - unchecked by default for comparison
+- **Without PaneForge**: Simple grid layout for baseline testing
+- **With PaneForge**: Dual-pane layout (empty pane + icons pane)
 - **Default**: 100 icons (safe starting point)
 - **Interactive**: Adjustable via number input
 
-## 📊 Detailed Thresholds
+## 📊 Detailed Test Results
 
-| Configuration | Icon Count                | Method       | Result     |
-| ------------- | ------------------------- | ------------ | ---------- |
-| 3 Panes       | 100 per pane (300 total)  | Any          | ✅ Works   |
-| 3 Panes       | 500 per pane (1500 total) | Any          | ❌ Crashes |
-| 1 Pane        | 1000+ icons               | Initial load | ❌ Crashes |
-| 1 Pane        | 3000+ icons               | Incremental  | ✅ Works   |
+| Configuration | Loading Method | Icon Count | Result | Notes |
+|---------------|----------------|------------|--------|--------|
+| **No PaneForge** | Incremental | 2000+ | ✅ Works | Safe method |
+| **No PaneForge** | Direct Navigation | 1400 | ✅ Works | Safe threshold |
+| **No PaneForge** | Direct Navigation | 1500+ | ❌ Crashes | Initialization overload |
+| **With PaneForge** | Incremental | 1400 | ❌ Crashes | PaneForge breaks everything |
+| **With PaneForge** | Direct Navigation | 1400 | ❌ Crashes | PaneForge breaks everything |
 
 ## 🔬 Technical Details
 
@@ -97,19 +109,19 @@ Maximum update depth exceeded. This typically indicates that an effect reads and
 
 ### Workarounds
 
-1. **Avoid multiple panes** with many icons each
-2. **Consolidate icons** into fewer panes when possible
-3. **Load incrementally** rather than bulk initial loading
-4. **Implement lazy loading** with IntersectionObserver
+1. **Avoid PaneForge** when using many icons (primary fix)
+2. **Use incremental loading** instead of direct navigation to high icon counts
+3. **Stay under 1400 icons** if PaneForge is required
+4. **Implement lazy loading** with IntersectionObserver for large icon sets
 
 ### For Iconify Maintainers
 
 This reproduction case provides:
 
-- **Isolated test environment** for debugging
-- **Two distinct scenarios** to investigate
-- **Clear thresholds** for triggering the issue
-- **Evidence** that it's related to initialization timing, not just icon count
+- **Isolated test environment** for debugging both PaneForge and pure Iconify issues
+- **Clear evidence** that PaneForge interaction is the primary trigger
+- **Proof** that initialization timing matters more than total icon count
+- **Systematic test cases** with specific thresholds and loading methods
 
 ## 🚀 Development Commands
 
