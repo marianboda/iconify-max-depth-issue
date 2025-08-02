@@ -38,13 +38,6 @@ npm install && npm run dev
 **Stack**: SvelteKit + Svelte 5 + @iconify/svelte + PaneForge
 **Issue**: Infinite update loop in icon loading during bulk initialization
 
-## 💡 Workarounds
-
-1. **Avoid PaneForge** with many icons (primary fix)
-2. **Use incremental loading** vs direct navigation
-3. **Stay under 1400 icons** if PaneForge required
-4. **Implement lazy loading** for large icon sets
-
 ## 🚀 Commands
 
 ```bash
