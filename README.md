@@ -2,7 +2,7 @@
 
 A minimal SvelteKit reproduction case for the `effect_update_depth_exceeded` error in @iconify/svelte when using many icons with PaneForge components.
 
-> **Note**: This reproduction case was developed with significant assistance from [Claude Code](https://claude.ai/code) for analysis, testing, and documentation.
+> **Note**: This reproduction case was developed with significant assistance from 🤖 [Claude Code](https://claude.ai/code) for analysis, testing, and documentation.
 
 **Related Issue**: [Iconify GitHub Issue #386](https://github.com/iconify/iconify/issues/386)
 
